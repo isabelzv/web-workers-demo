@@ -6,6 +6,9 @@
   var canvas = document.querySelector('#image');
   var ctx = canvas.getContext('2d');
 
+  // create new worker
+  var imageWorker = new Worker("scripts/worker.js");
+
   function handleImage(e){
     var reader = new FileReader();
     reader.onload = function(event){
@@ -39,24 +42,28 @@
     imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     toggleButtonsAbledness();
+    // post message to worker, giving it the image data and the button type.
+    imageWorker.postMessage({'imageData': imageData, 'type': type});
 
-    // Hint! This is where you should post messages to the web worker and
-    // receive messages from the web worker.
-
-    length = imageData.data.length / 4;
-    for (i = j = 0, ref = length; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
-      r = imageData.data[i * 4 + 0];
-      g = imageData.data[i * 4 + 1];
-      b = imageData.data[i * 4 + 2];
-      a = imageData.data[i * 4 + 3];
-      pixel = manipulate(type, r, g, b, a);
-      imageData.data[i * 4 + 0] = pixel[0];
-      imageData.data[i * 4 + 1] = pixel[1];
-      imageData.data[i * 4 + 2] = pixel[2];
-      imageData.data[i * 4 + 3] = pixel[3];
+    // function to be run when the worker sends something back. e is the message.
+    imageWorker.onmessage = function(e) {
+      // toggle the buttons back on.
+      toggleButtonsAbledness();
+      // image data from the massage from the worker is put into 'image' variable.
+      var image = e.data;
+      // if there is an image, return and attach image to the canvas.
+      if (image) return ctx.putImageData(e.data, 0, 0);
+      // otherwise
+      console.log("No manipulated image returned.")
     }
-    toggleButtonsAbledness();
-    return ctx.putImageData(imageData, 0, 0);
+
+    // error handler
+    imageWorker.onerror = function(error) {
+      function WorkerException(message) {
+        this.message = message;
+      };
+      throw new WorkerException('worker error.');
+    };
   };
 
   function revertImage() {
